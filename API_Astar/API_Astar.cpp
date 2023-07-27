@@ -4,38 +4,8 @@
 #include "framework.h"
 #include "API_Astar.h"
 
-#include <list>
-#include <string>
-using namespace std;
+#include "Node.h"
 
-
-// >> 
-typedef struct node
-{
-    POINT location; // 중심점
-    node* neighbor[8];
-
-    int Gvalue = 0;
-    int Hvalue = 0;
-    int Fvalue = Gvalue + Hvalue;
-};
-
-// 탐색 노드 관리 리스트
-list<node*> open;
-list<node*> closed;
-
-// 마우스 위치
-static POINT mousePos[2];
-
-// 맵 크기
-const int MapSize = 80;
-
-// 함수
-void AStar();
-void PaintGrid(HDC hdc);
-TCHAR* intToTCHAR(int value);
-
-// <<
 #define MAX_LOADSTRING 100
 
 // 전역 변수:
@@ -157,9 +127,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    //static bool isClicked = FALSE;
     static int clickCount = 0;
-
+    Node start;
+    
     switch (message)
     {
     case WM_LBUTTONDOWN:
@@ -178,7 +148,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         */
 
-        InvalidateRect(hWnd, NULL, TRUE);
+        //InvalidateRect(hWnd, NULL, TRUE);
     }
         break;
     case WM_PAINT:
@@ -186,11 +156,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
 
-        //if (clickCount >= 2)
-        {
-            AStar();
-            PaintGrid(hdc);
-        }
+        start.Astar();
+        start.PaintGrid(hdc);
+        
 
         EndPaint(hWnd, &ps);
     }
@@ -222,157 +190,4 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
-}
-
-
-
-void AStar()
-{
-    // 왼쪽 대각선부터 시계 방향
-    int xDir[8] = { -1,0,1,1,1,0,-1,-1 }; 
-    int yDir[8] = { -1,-1,-1,0,1,1,1,0 };
-    int cost[8] = { 14,10,14,10,14,10,14,10 };
-
-    // 시작과 도착 노드 설정
-    node* source = new node; 
-    node* dest = new node;
-    
-    //source->location = mousePos[0];
-    source->location = { 200, 200 };
-    source->Gvalue = 0;
-    source->Hvalue = 42; // 목적지 임시로 설정
-    source->Fvalue = source->Gvalue + source->Hvalue;
-    
-    //dest->location = mousePos[1];
-    dest->location = { 200,200 };
-    dest->Gvalue = 42;  // 시작 지점 임시로 설정
-    dest->Hvalue = 0; 
-    dest->Fvalue = dest->Gvalue + dest->Hvalue;
-
-    // 시작 노드의 neighbor 설정
-    for (int i = 0; i < 8; i++)
-    {
-        node* temp = new node;
-        temp->location.x = source->location.x + (xDir[i] * MapSize);
-        temp->location.y = source->location.y + (yDir[i] * MapSize);
-        temp->Gvalue += cost[i];
-        //temp->Hvalue =  ; // ?
-        temp->Fvalue = temp->Gvalue + temp->Hvalue;
-        source->neighbor[i] = temp;
-        open.push_back(source->neighbor[i]);
-    }
-
-    // 시작 노드 push
-    open.push_back(source);
-
-    while (1)
-    {
-        // 변수 설정
-        node* current = new node;
-        list<node*>::iterator itC;
-        list<node*>::iterator itO;
-        int minF = 0; // F값 중 최소
-        list<node*>::iterator temp;
-
-        if (open.size() == 1)
-            current = source;
-        else
-        {
-            // F값이 제일 작은 게 current 노드가 됨
-            for (itO = closed.begin(); itO != closed.end(); itO++)
-            {
-                if ((*itO)->Fvalue < minF)
-                    minF = (*itO)->Fvalue;
-                
-                current = *itO;
-                temp = itO;
-            }
-
-            open.erase(temp); // F값 중 제일 작은 걸 삭제
-        }
-
-        closed.push_back(current);
-
-        if (current == dest)
-            break;
-       
-
-        for (int i = 0; i < 8; i++)
-        {
-            // closed에 neighbor가 들어갔는지 확인
-            int check1 = 0;
-            for (itC = closed.begin(); itC != closed.end(); itC++)
-            {
-                if (current->neighbor[i] == (*itC))
-                    check1 = 1;
-            }
-
-            if (check1 == 1)  
-                continue;
-            
-
-            // open에 neighbor가 들어갔는지 확인
-            int check2 = 0;
-            for (itO = closed.begin(); itO != closed.end(); itO++)
-            {
-                if (current->neighbor[i] == (*itO))
-                    check2 = 1;
-            }
-
-            if (current->neighbor[i] || check2 == 1)
-            {
-                //current->neighbor[i]->Fvalue = ;
-            }
-
-
-        }
-
-    }
-
-}
-
-void PaintGrid(HDC hdc)
-{
-    // 사각형(맵)
-    for (int i = 0; i < 8; i++)
-    {
-        for (int j = 0; j < 8; j++)
-            Rectangle(hdc, MapSize * j, MapSize * i, MapSize * (j+1), MapSize * (i+1));
-    }
-    
-    //list<POINT*>::iterator it;
-
-    //// 숫자
-    // 시작 노드의 G, H, F
-    TCHAR* gValue = intToTCHAR(open.front()->Gvalue);
-    TCHAR* hValue = intToTCHAR(open.front()->Hvalue);
-    TCHAR* fValue = intToTCHAR(open.front()->Fvalue);
-
-    // 시작 노드 숫자
-    TextOut(hdc, open.front()->location.x - 30, open.front()->location.y - 20, gValue, _tcslen(gValue)); // G
-    TextOut(hdc, open.front()->location.x + 10, open.front()->location.y - 20, hValue, _tcslen(hValue)); // H
-    TextOut(hdc, open.front()->location.x - 10, open.front()->location.y + 10, fValue, _tcslen(fValue)); // F
-    
-    // neighbor의 G, H, F
-    for (int i = 0; i < 8; i++)
-    {
-        TCHAR* gValue = intToTCHAR(open.front()->neighbor[i]->Gvalue);
-        TCHAR* hValue = intToTCHAR(open.front()->neighbor[i]->Hvalue);
-        TCHAR* fValue = intToTCHAR(open.front()->neighbor[i]->Fvalue);
-
-        TextOut(hdc, open.front()->neighbor[i]->location.x - 30, open.front()->neighbor[i]->location.y - 20, gValue, _tcslen(gValue)); // G
-        TextOut(hdc, open.front()->neighbor[i]->location.x + 10, open.front()->neighbor[i]->location.y - 20, hValue, _tcslen(hValue)); // H
-        TextOut(hdc, open.front()->neighbor[i]->location.x - 10, open.front()->neighbor[i]->location.y + 10, fValue, _tcslen(fValue)); // F
-    }
-}
-
-TCHAR* intToTCHAR(int value)
-{
-    // int -> string -> TCHAR
-    string sValue = to_string(value);
-    TCHAR* tValue = new TCHAR[sValue.size() + 1];
-    tValue[sValue.size()] = 0;
-    copy(sValue.begin(), sValue.end(), tValue);
-
-    return tValue;
 }
