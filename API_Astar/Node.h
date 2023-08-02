@@ -1,198 +1,147 @@
 #pragma once
-#include <list>
+#include <vector>
 #include <string>
+#include <iostream>
 using namespace std;
 
-// 마우스 위치
-static POINT mousePos[2];
-// 맵 크기
-const int MapSize = 80;
+#define COLUMN 10
+#define ROW 11
+const int radius = 30;
+enum Information { StartNode, Obstacle, EndNode, OpenNode, Start, None };
+
 
 class Node
 {
 private:
-    //const int neighborSize = 8;
-    POINT location; // 중심점
-    list<Node*> neighbor;
+    POINT center; // 중심점
 
-    int G;
-    int H;
-    int F;
+    int G;  int H;  int F;
+
+    HBRUSH hBrush;
+    Information PaintStat;
+
+    const Node* parent;
+
+    // index
+    POINT Index;
+
 public:
+
     Node();
+    Node(int i, int j);
     ~Node();
 
-    //Node(POINT p, list<Node*> neigh, int g, int h, int f) { location = p; neighbor = neigh; G = g; H = h; F = f; }
-
+    void setCenter(POINT cen) { center = cen; }
     void setG(int g) { G = g; }
     void setH(int h) { H = h; }
-    void setF(int f) { F = f; }
+    void setF() { F = getG() + getH(); }
+    void setPaintStat(Information status) { PaintStat = status; }
+    void setParent(const Node* n) { parent = n; }
 
+    int getCenterX() { return center.x; }
+    int getCenterY() { return center.y; }
     int getG() { return G; }
     int getH() { return H; }
-    int getF() { return F; }
+    int getF() const { return F; }
+    int getPaintStat() { return PaintStat; }
+    POINT getIndex() { return Index; }
 
+    // 노드 위치 체크
+    bool InsideRect(POINT mouse);
 
-    void Astar();
-    void PaintGrid(HDC hdc);
+    // 전체 틀 그리기 + 색칠
+    void Draw(HDC hdc);
+    void Paint(HDC hdc);
 };
 
 // 탐색 노드 관리 리스트
-list<Node*> open;
-list<Node*> closed;
 
 Node::Node()
 {
-    location = { 0, 0 };
-    for (int i = 0; i < 8; i++)
-        neighbor.push_back(NULL);
+    center = { 60, 60 };
     G = H = F = 0;
+    PaintStat = None;
+    hBrush = CreateSolidBrush(RGB(255, 255, 255));
+    parent = nullptr;
 }
-
+Node::Node(int i, int j)
+{
+    center = { 60, 60 };
+    G = H = F = 0;
+    PaintStat = None;
+    hBrush = CreateSolidBrush(RGB(255, 255, 255));
+    parent = nullptr;
+    Index = { i, j };
+}
 Node::~Node()
 {
+    DeleteObject(hBrush);
 }
 
-void Node::Astar()
+bool Node::InsideRect(POINT mouse)
 {
-    // 왼쪽 대각선부터 시계 방향
-    int xDir[8] = { -1,0,1,1,1,0,-1,-1 };
-    int yDir[8] = { -1,-1,-1,0,1,1,1,0 };
-    int cost[8] = { 14,10,14,10,14,10,14,10 };
-
-    // 시작과 도착 노드 설정
-    Node source, dest;
-    source.location = { 200, 200 };
-    source.setF(0);
-    source.setG(42);
-    source.setH(42);
-
-    dest.location = { 400, 400 };
-    dest.setF(42);
-    dest.setG(0);
-    dest.setH(42);
-
-    //source->location = mousePos[0];
-    //dest->location = mousePos[1];
-
-    // 시작 노드의 neighbor 설정
-    for (int i = 0; i < 8; i++)
+    if (center.x - radius < mouse.x && mouse.x < center.x + radius)
     {
-        Node* temp = new Node;
-       /* temp.location.x = source.location.x + (xDir[i] * MapSize);
-        temp.location.y = source.location.y + (yDir[i] * MapSize);
-        temp.setG(cost[i]);
-        temp.setF(temp.getG() + temp.getH());
-        */
-        temp->location.x = source.location.x + (xDir[i] * MapSize);
-        temp->location.y = source.location.y + (yDir[i] * MapSize);
-        temp->setG(cost[i]);
-        temp->setF(temp->getG() + temp->getH());
-        //temp.setH(); // ?
-
-        source.neighbor.push_back(temp);
+        if (center.y - radius < mouse.y && mouse.y < center.y + radius)
+            return TRUE;
     }
-
-    // 시작 노드 push
-    open.push_back(&source);
-
-    //while (1)
-    //{
-    //    break;
-    //    // 변수 설정
-    //    Node current;
-    //    list<Node*>::iterator itC;
-    //    list<Node*>::iterator itO;
-    //    list<Node*>::iterator temp;
-    //    list<Node*>::iterator curNeigh;
-
-    //    int minF = 0; // F값 중 최소
-
-    //    if (open.size() == 1)
-    //        current = source;
-    //    else
-    //    {
-    //        // F값이 제일 작은 게 current 노드가 됨
-    //        for (itO = closed.begin(); itO != closed.end(); itO++)
-    //        {
-    //            if ((*itO)->getF() < minF)
-    //                minF = (*itO)->getF();
-
-    //            //current = (*itO);
-    //            temp = itO;
-    //        }
-    //        open.erase(temp); // F값 중 제일 작은 걸 삭제
-    //    }
-
-    //    closed.push_back(&current);
-
-    //    //if (current == dest)
-    //        break;
-    //    
-    //    for (curNeigh = current.neighbor.begin(); curNeigh != current.neighbor.end(); curNeigh++)
-    //    {
-    //        // closed에 neighbor가 들어갔는지 확인
-    //        int check1 = 0;
-    //        for (itC = closed.begin(); itC != closed.end(); itC++)
-    //        {
-    //            if ((*curNeigh) == (*itC))
-    //                check1 = 1;
-    //        }
-
-    //        if (check1 == 1)
-    //            continue;
-
-    //        // open에 neighbor가 들어갔는지 확인
-    //        int check2 = 0;
-    //        for (itO = closed.begin(); itO != closed.end(); itO++)
-    //        {
-    //            if ((*curNeigh) == (*itO))
-    //                check2 = 1;
-    //        }
-
-    //        if ((*curNeigh) || check2 == 1)
-    //        {
-    //            //current->neighbor[i]->Fvalue = ;
-    //        }
-
-    //    }
-
-    //}
-
+    return FALSE;
 }
 
-void Node::PaintGrid(HDC hdc)
+void Node::Draw(HDC hdc)
 {
-    // 사각형(맵)
-    for (int i = 0; i < 8; i++)
+    Rectangle(hdc, center.x - radius, center.y - radius, center.x + radius, center.y + radius);
+}
+
+void Node::Paint(HDC hdc)
+{
+    HBRUSH oldBrush = NULL;
+
+    // 노드 브러쉬 설정
+    switch (PaintStat)
     {
-        for (int j = 0; j < 8; j++)
-            Rectangle(hdc, MapSize * j, MapSize * i, MapSize * (j + 1), MapSize * (i + 1));
+    case StartNode:
+    {
+        DeleteObject(hBrush); // 생성자에서 생성한 브러쉬 삭제
+        hBrush = CreateSolidBrush(RGB(255, 255, 0));  // 색칠할 색깔 설정
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush); // 쓰던 브러쉬를 다른 곳에 반환
+    }
+    break;
+    case Obstacle:
+    {
+        DeleteObject(hBrush);
+        hBrush = CreateSolidBrush(RGB(0, 0, 0));
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+    }
+    break;
+    case EndNode:
+    {
+        DeleteObject(hBrush);
+        hBrush = CreateSolidBrush(RGB(255, 0, 0));
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+    }
+    break;
+    case OpenNode:
+    {
+        DeleteObject(hBrush);
+        hBrush = CreateSolidBrush(RGB(255, 128, 0));
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+    }
+    break;
+    default:
+        break;
     }
 
-    //list<POINT*>::iterator it;
+    Draw(hdc);   // 설정된 브러쉬로 도형 그리기(+색칠)
+    SelectObject(hdc, oldBrush); // 다시 원래의 브러쉬로 돌아가기
+}
 
-    //// 숫자
-    // 시작 노드의 G, H, F
-    TCHAR buffer[20];
-    wsprintf(buffer, TEXT("%d"), open.front()->getG());
-    TextOut(hdc, open.front()->location.x - 30, open.front()->location.y - 20, buffer, lstrlen(buffer));
-    wsprintf(buffer, TEXT("%d"), open.front()->getH());
-    TextOut(hdc, open.front()->location.x + 10, open.front()->location.y - 20, buffer, lstrlen(buffer));
-    wsprintf(buffer, TEXT("%d"), open.front()->getF());
-    TextOut(hdc, open.front()->location.x - 10, open.front()->location.y + 10, buffer, lstrlen(buffer));
-   
-    list<Node*>::iterator curNeigh1;
-
-    // neighbor의 G, H, F
-    for (curNeigh1 = open.front()->neighbor.begin(); curNeigh1 != open.front()->neighbor.end(); curNeigh1++)
-    {
-        TCHAR buffer[20];
-        wsprintf(buffer, TEXT("%d"), (*curNeigh1)->getG());
-        TextOut(hdc, (*curNeigh1)->location.x - 30, (*curNeigh1)->location.y - 20, buffer, lstrlen(buffer)); // G
-        wsprintf(buffer, TEXT("%d"), (*curNeigh1)->getH());
-        TextOut(hdc, (*curNeigh1)->location.x + 10, (*curNeigh1)->location.y - 20, buffer, lstrlen(buffer)); // F
-        wsprintf(buffer, TEXT("%d"), (*curNeigh1)->getF());
-        TextOut(hdc, (*curNeigh1)->location.x - 10, (*curNeigh1)->location.y + 10, buffer, lstrlen(buffer)); // H
-    }
+// priority queue를 위한 연산자 오버로딩
+bool operator< (const Node& node1, const Node& node2)
+{
+    return node1.getF() > node2.getF();
+}
+bool operator> (const Node& node1, const Node& node2)
+{
+    return node1.getF() < node2.getF();
 }
