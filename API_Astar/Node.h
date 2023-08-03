@@ -7,7 +7,7 @@ using namespace std;
 #define COLUMN 10
 #define ROW 11
 const int radius = 30;
-enum Information { StartNode, Obstacle, EndNode, OpenNode, Start, None };
+enum Information { StartNode, Obstacle, EndNode, OpenNode, CloseNode, None };
 
 
 class Node
@@ -125,6 +125,13 @@ void Node::Paint(HDC hdc)
     {
         DeleteObject(hBrush);
         hBrush = CreateSolidBrush(RGB(255, 128, 0));
+        oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
+    }
+    break;
+    case CloseNode:
+    {
+        DeleteObject(hBrush);
+        hBrush = CreateSolidBrush(RGB(128, 128, 0));
         oldBrush = (HBRUSH)SelectObject(hdc, hBrush);
     }
     break;
