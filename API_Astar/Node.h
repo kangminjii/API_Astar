@@ -20,7 +20,7 @@ private:
     HBRUSH hBrush;
     Information PaintStat;
 
-    const Node* parent;
+    Node* parent;
 
     // index
     POINT Index;
@@ -35,15 +35,18 @@ public:
     void setG(int g) { G = g; }
     void setH(int h) { H = h; }
     void setF() { F = getG() + getH(); }
+
     void setPaintStat(Information status) { PaintStat = status; }
-    void setParent(const Node* n) { parent = n; }
+    void setParent(Node* n) { parent = n; }
 
     int getCenterX() { return center.x; }
     int getCenterY() { return center.y; }
     int getG() { return G; }
     int getH() { return H; }
     int getF() const { return F; }
+
     int getPaintStat() { return PaintStat; }
+    Node* getParent() { return parent; }
     POINT getIndex() { return Index; }
 
     // 노드 위치 체크

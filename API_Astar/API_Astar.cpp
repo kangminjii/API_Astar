@@ -46,6 +46,7 @@ POINT arrayIndex1, arrayIndex2; // 시작 노드, 종료 노드 인덱스 저장
 void InitNode();                // 동적할당된 노드 초기화
 bool isStart = FALSE;           // A* 시작 플래그
 bool isEnd = FALSE;             // A* 종료 플래그
+bool isChecked = FALSE;
 
 
 
@@ -188,18 +189,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         // 키보드 입력으로 메뉴 구분 (1. 시작노드 설정  2. 장애물 설정  3. 끝노드 설정  4. 시작)
         if (wParam == '1')
-        {
-            //isStart = TRUE;
             status = StartNode;
-        }
         else if (wParam == '2')
             status = Obstacle;
         else if (wParam == '3')
             status = EndNode;
 
         // A* 실행
-        if (wParam == VK_SPACE)
+        if (wParam == VK_SPACE && isEnd == FALSE)
             Astar();
+       
 
         InvalidateRect(hWnd, NULL, FALSE);
     }
@@ -220,7 +219,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                     if (status == StartNode)  // 시작 점 넣기
                     {
-                        //open.push(*node[arrayIndex1.x][arrayIndex1.y]);
                         arrayIndex1 = node[i][j]->getIndex();
                     }
                     else if (status == EndNode) // 끝 점 넣기
@@ -289,7 +287,6 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
-
 void InitNode()
 {
     for (int i = 0; i < ROW; i++)
@@ -304,7 +301,7 @@ void InitNode()
     }
 
 }
-bool isChecked = FALSE;
+
 void Astar()
 {
     // H값 저장
@@ -326,6 +323,9 @@ void Astar()
     int yDir[8] = { -1,-1,-1,0,1,1,1,0 };
     int cost[8] = { 14,10,14,10,14,10,14,10 };
 
+    Node* startNode = node[arrayIndex1.x][arrayIndex1.y];
+    Node* endNode = node[arrayIndex2.x][arrayIndex2.y];
+
     // 시작점 주변 neighbor의 G값과 부모 저장
     // 탐색 시작
     if (!isChecked)
@@ -338,54 +338,64 @@ void Astar()
 
             if ((0 <= nodeRow && nodeRow < ROW) && (0 <= nodeCol && nodeCol < COLUMN))
             {
-                Node* tempNode = node[nodeRow][nodeCol];
-                tempNode->setG(cost[i]);
-                tempNode->setF();
-                open.push(*tempNode);
-                tempNode->setPaintStat(OpenNode);
-                tempNode->setParent(node[arrayIndex1.x][arrayIndex1.y]); // parent를 const Node*로 변경
+                //Node* tempNode = node[nodeRow][nodeCol];
+                node[nodeRow][nodeCol]->setG(cost[i]);
+                node[nodeRow][nodeCol]->setF();
+                open.push(*node[nodeRow][nodeCol]);
+                node[nodeRow][nodeCol]->setPaintStat(OpenNode);
+                node[nodeRow][nodeCol]->setParent(startNode);
             }
         }
-        closed.push_back(*node[arrayIndex1.x][arrayIndex1.y]);
+        closed.push_back(*endNode);
+        startNode->setPaintStat(CloseNode);
     }
     isChecked = TRUE;
 
     static int a = 0;
-    cout << "loop 다시" << endl;
-    cout << "a = " << a << ", closed : (" << closed[0].getIndex().x << ", " << closed[0].getIndex().y << ")" << endl;
 
     // 계속 탐색하기
     while (!open.empty())
     {
-        cout << "isEnd : " << isEnd << endl;
         if (isEnd)
             break;
 
         Node temp = open.top();
         closed.push_back(temp);
+        temp.setPaintStat(CloseNode);
         open.pop();
 
 
         cout << "open.top : " << temp.getIndex().x << ", " << temp.getIndex().y << endl;
-        cout << "a = " << a << ", closed : (" << closed[++a].getIndex().x << ", " << closed[a].getIndex().y << ")" << endl;
+        cout << "status : " << temp.getPaintStat() << endl;
 
-
+        // 새로운 노드(temp)의 neighbor 비교
         for (int i = 0; i < 8; i++)
         {
             int nodeRow1 = temp.getIndex().x + xDir[i];
             int nodeCol1 = temp.getIndex().y + yDir[i];
-
-            // 새로운 노드의 neighbor 비교
+           
             if ((0 <= nodeRow1 && nodeRow1 < ROW) && (0 <= nodeCol1 && nodeCol1 < COLUMN))
             {
                 bool isClosed = FALSE;
 
                 Node* neighbor = node[nodeRow1][nodeCol1];
+               
+                cout << "neighbor index: " << neighbor->getIndex().x << ", " << neighbor->getIndex().y << endl;
+                cout << "neighbor stat: " << neighbor->getPaintStat() << endl;
+                
+                // 종료 조건
+                if (neighbor->getPaintStat() == EndNode)
+                {
+                    cout << "찾았따" << endl;
+                    neighbor->setParent(&temp);
+                    isEnd = TRUE;
+                    break;
+                }
 
                 // closed인가? 
                 for (int j = 0; j < closed.size(); j++)
                 {
-                    if ((temp.getIndex().x == closed[j].getIndex().x) && (temp.getIndex().y == closed[j].getIndex().y))
+                    if ((neighbor->getIndex().x == closed[j].getIndex().x) && (neighbor->getIndex().y == closed[j].getIndex().y))
                     {
                         isClosed = TRUE;
                         break;
@@ -399,13 +409,11 @@ void Astar()
                 if (neighbor->getPaintStat() == Obstacle)
                     continue;
 
-                // 종료 조건
-                if (neighbor->getPaintStat() == EndNode)
-                {
-                    cout << "찾았따" << endl;
-                    isEnd = TRUE;
-                    break;
-                }
+                neighbor->setG(temp.getG() + cost[i]);
+                neighbor->setF();
+                neighbor->setParent(&temp);
+                cout << "parent : " << neighbor->getParent()->getIndex().x << ", " << neighbor->getParent()->getIndex().y << endl;
+
 
                 // open에 있는가?
                 if (neighbor->getPaintStat() != OpenNode)
@@ -413,9 +421,9 @@ void Astar()
                     neighbor->setPaintStat(OpenNode);
                     neighbor->setParent(&temp);
                     open.push(*neighbor);
-                    continue;
+                    //continue;
                 }
-                else
+                else // open에 있다
                 {
                     int neighborG = neighbor->getG();
                     int tempG = temp.getG() + neighborG;
@@ -425,7 +433,7 @@ void Astar()
                     {
                         // G값, F값 갱신
                         neighbor->setG(tempG);
-                        neighbor->setParent(&temp);
+                        neighbor->setPaintStat(OpenNode);
                         neighbor->setF();
                         open.push(*neighbor);
                     }
@@ -434,13 +442,28 @@ void Astar()
         }
     }
 
-    // 최종 출력
-    for (int i = 0; i < closed.size(); i++)
-    {
-        closed[i].setPaintStat(CloseNode);
-    }
 
+    //if (isEnd)
+    //{
+    //    vector<Node*> result;
+    //    Node* temp = endNode->getParent();
 
+    //    cout << "temp : " << temp->getIndex().x << ", " << temp->getIndex().y << endl;
+    //    /*while (1)
+    //    {
+    //        if ((temp->getIndex().x == startNode->getIndex().x) && (temp->getIndex().y == startNode->getIndex().y))
+    //            break;
+
+    //        result.push_back(temp);
+    //        temp = temp->getParent();
+    //    }
+
+    //    for (int i = 0; i < result.size(); i++)
+    //    {
+    //        result[i]->setPaintStat(Obstacle);
+    //    }*/
+
+    //}
 
 
 }
