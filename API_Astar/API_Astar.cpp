@@ -48,7 +48,9 @@ bool isStart = FALSE;           // A* 시작 플래그
 bool isEnd = FALSE;             // A* 종료 플래그
 bool isChecked = FALSE;
 
-
+// 최종 결과물
+vector<Node*> result;
+int order = result.size();
 
 #define MAX_LOADSTRING 100
 
@@ -183,8 +185,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             for (int j = 0; j < COLUMN; j++)
                 node[i][j]->setCenter({ 60 + 60 * j, 60 + 60 * i });
         }
+
+        SetTimer(hWnd, 1, 500, NULL);
     }
     break;
+    case WM_TIMER:
+        InvalidateRect(hWnd, NULL, FALSE);
+        break;
     case WM_KEYDOWN:
     {
         // 키보드 입력으로 메뉴 구분 (1. 시작노드 설정  2. 장애물 설정  3. 끝노드 설정  4. 시작)
@@ -198,7 +205,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // A* 실행
         if (wParam == VK_SPACE && isEnd == FALSE)
             Astar();
-       
 
         InvalidateRect(hWnd, NULL, FALSE);
     }
@@ -237,7 +243,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
 
-
         // 전체 맵, 숫자 그리기
         for (int i = 0; i < ROW; i++)
         {
@@ -255,10 +260,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
 
+        if (isEnd)
+        {
+            //if (j >= 0)
+            if (order < result.size())
+            {
+                Ellipse(hdc, result[order]->getCenterX() - radius / 2, result[order]->getCenterY() - radius / 2, result[order]->getCenterX() + radius / 2, result[order]->getCenterY() + radius / 2);
+                order++;
+            }
+        }
+
         EndPaint(hWnd, &ps);
     }
     break;
     case WM_DESTROY:
+        KillTimer(hWnd, 1);
         PostQuitMessage(0);
         break;
     default:
@@ -304,20 +320,6 @@ void InitNode()
 
 void Astar()
 {
-    // H값 저장
-    for (int i = 0; i < ROW; i++)
-    {
-        for (int j = 0; j < COLUMN; j++)
-        {
-            int width = abs(arrayIndex2.x - i);
-            int height = abs(arrayIndex2.y - j);
-            int max = (width > height) ? width : height;
-            int min = (width > height) ? height : width;
-            node[i][j]->setH(min * 14 + (max - min) * 10);
-            node[i][j]->setF();
-        }
-    }
-
     // 왼쪽 대각선부터 시계 방향
     int xDir[8] = { -1,0,1,1,1,0,-1,-1 };
     int yDir[8] = { -1,-1,-1,0,1,1,1,0 };
@@ -326,34 +328,9 @@ void Astar()
     Node* startNode = node[arrayIndex1.x][arrayIndex1.y];
     Node* endNode = node[arrayIndex2.x][arrayIndex2.y];
 
-    // 시작점 주변 neighbor의 G값과 부모 저장
-    // 탐색 시작
-    if (!isChecked)
-    {
-        for (int i = 0; i < 8; i++)
-        {
-            // 노드를 그린 범위 안에 있을 때만
-            int nodeRow = arrayIndex1.x + xDir[i];
-            int nodeCol = arrayIndex1.y + yDir[i];
+    // 탐색하기
+    open.push(*startNode);
 
-            if ((0 <= nodeRow && nodeRow < ROW) && (0 <= nodeCol && nodeCol < COLUMN))
-            {
-                //Node* tempNode = node[nodeRow][nodeCol];
-                node[nodeRow][nodeCol]->setG(cost[i]);
-                node[nodeRow][nodeCol]->setF();
-                open.push(*node[nodeRow][nodeCol]);
-                node[nodeRow][nodeCol]->setPaintStat(OpenNode);
-                node[nodeRow][nodeCol]->setParent(startNode);
-            }
-        }
-        closed.push_back(*endNode);
-        startNode->setPaintStat(CloseNode);
-    }
-    isChecked = TRUE;
-
-    static int a = 0;
-
-    // 계속 탐색하기
     while (!open.empty())
     {
         if (isEnd)
@@ -361,33 +338,25 @@ void Astar()
 
         Node temp = open.top();
         closed.push_back(temp);
-        temp.setPaintStat(CloseNode);
+        node[temp.getIndex().x][temp.getIndex().y]->setPaintStat(CloseNode);
         open.pop();
-
-
-        cout << "open.top : " << temp.getIndex().x << ", " << temp.getIndex().y << endl;
-        cout << "status : " << temp.getPaintStat() << endl;
 
         // 새로운 노드(temp)의 neighbor 비교
         for (int i = 0; i < 8; i++)
         {
             int nodeRow1 = temp.getIndex().x + xDir[i];
             int nodeCol1 = temp.getIndex().y + yDir[i];
-           
+
             if ((0 <= nodeRow1 && nodeRow1 < ROW) && (0 <= nodeCol1 && nodeCol1 < COLUMN))
             {
                 bool isClosed = FALSE;
 
                 Node* neighbor = node[nodeRow1][nodeCol1];
-               
-                cout << "neighbor index: " << neighbor->getIndex().x << ", " << neighbor->getIndex().y << endl;
-                cout << "neighbor stat: " << neighbor->getPaintStat() << endl;
-                
+
                 // 종료 조건
                 if (neighbor->getPaintStat() == EndNode)
                 {
-                    cout << "찾았따" << endl;
-                    neighbor->setParent(&temp);
+                    neighbor->setParent(node[temp.getIndex().x][temp.getIndex().y]);
                     isEnd = TRUE;
                     break;
                 }
@@ -401,7 +370,6 @@ void Astar()
                         break;
                     }
                 }
-
                 if (isClosed)
                     continue;
 
@@ -409,61 +377,68 @@ void Astar()
                 if (neighbor->getPaintStat() == Obstacle)
                     continue;
 
-                neighbor->setG(temp.getG() + cost[i]);
-                neighbor->setF();
-                neighbor->setParent(&temp);
-                cout << "parent : " << neighbor->getParent()->getIndex().x << ", " << neighbor->getParent()->getIndex().y << endl;
-
-
                 // open에 있는가?
+                // open에 없다 -> 시작 상태의 노드이다
                 if (neighbor->getPaintStat() != OpenNode)
                 {
                     neighbor->setPaintStat(OpenNode);
-                    neighbor->setParent(&temp);
+                    neighbor->setParent(node[temp.getIndex().x][temp.getIndex().y]);
+
+                    // neighbor의 G, H, F 값 설정
+                    neighbor->setG(temp.getG() + cost[i]);
+
+                    int width = abs(arrayIndex2.x - neighbor->getIndex().x);
+                    int height = abs(arrayIndex2.y - neighbor->getIndex().y);
+                    int max = (width > height) ? width : height;
+                    int min = (width > height) ? height : width;
+                    neighbor->setH(min * 14 + (max - min) * 10);
+
+                    neighbor->setF();
+
                     open.push(*neighbor);
-                    //continue;
                 }
-                else // open에 있다
+                // open에 있다
+                else
                 {
                     int neighborG = neighbor->getG();
                     int tempG = temp.getG() + neighborG;
+
                     if (neighborG <= tempG)
                         continue;
+                    // G값, F값 갱신
                     else
                     {
-                        // G값, F값 갱신
+                        neighbor->setParent(node[temp.getIndex().x][temp.getIndex().y]);
                         neighbor->setG(tempG);
-                        neighbor->setPaintStat(OpenNode);
                         neighbor->setF();
                         open.push(*neighbor);
+                        continue;
                     }
                 }
             }
         }
     }
 
+    // 결과 출력부분
+    if (isEnd)
+    {
+        Node* temp = endNode;
 
-    //if (isEnd)
-    //{
-    //    vector<Node*> result;
-    //    Node* temp = endNode->getParent();
+        while (1)
+        {
+            result.push_back(temp);
+            if ((temp->getIndex().x == startNode->getIndex().x) && (temp->getIndex().y == startNode->getIndex().y))
+                break;
+            temp = temp->getParent();
+        }
 
-    //    cout << "temp : " << temp->getIndex().x << ", " << temp->getIndex().y << endl;
-    //    /*while (1)
-    //    {
-    //        if ((temp->getIndex().x == startNode->getIndex().x) && (temp->getIndex().y == startNode->getIndex().y))
-    //            break;
+        std::reverse(result.begin(), result.end());
 
-    //        result.push_back(temp);
-    //        temp = temp->getParent();
-    //    }
+        // 결과 색깔지정
+        for (int i = 0; i < result.size(); i++)
+            result[i]->setPaintStat(Path);
 
-    //    for (int i = 0; i < result.size(); i++)
-    //    {
-    //        result[i]->setPaintStat(Obstacle);
-    //    }*/
-
-    //}
-
-
+        startNode->setPaintStat(StartNode);
+        endNode->setPaintStat(EndNode);
+    }
 }
